@@ -96,6 +96,7 @@ objects:
 
              stage ('Build') {
                git branch: 'master', url: 'http://gogs:3000/gogs/kitchensink.git'
+               sh "curl -O https://raw.githubusercontent.com/jbrannst/openshift-cd-demo/ocp-3.5/configuration/maven-settings.xml"
                sh "${mvnCmd} clean install -DskipTests=true"
              }
 
