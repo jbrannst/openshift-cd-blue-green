@@ -75,7 +75,7 @@ objects:
     labels:
       app: cicd-pipeline
       name: cicd-pipeline
-    name: tasks-pipeline
+    name: cicd-pipeline
   spec:
     triggers:
       - type: GitHub
@@ -95,7 +95,7 @@ objects:
              def mvnCmd = "mvn -s configuration/cicd-settings.xml"
 
              stage ('Build') {
-               git branch: 'eap-7', url: 'http://gogs:3000/gogs/openshift-tasks.git'
+               git branch: 'eap-7', url: 'http://gogs:3000/gogs/kitchensink.git'
                sh "${mvnCmd} clean install -DskipTests=true"
              }
 
@@ -117,17 +117,20 @@ objects:
 
              stage ('Deploy DEV') {
                sh "rm -rf oc-build && mkdir -p oc-build/deployments"
-               sh "cp target/openshift-tasks.war oc-build/deployments/ROOT.war"
+               sh "cp target/jboss-kitchensink-angularjs.war oc-build/deployments/ROOT.war"
                sh "oc project ${DEV_PROJECT}"
                // clean up. keep the image stream
-               sh "oc delete bc,dc,svc,route -l app=tasks -n ${DEV_PROJECT}"
+               //sh "oc delete bc,dc,svc,route -l app=tasks -n ${DEV_PROJECT}"
+               sh "oc delete bc,dc,svc,route -l application=kitchensink -n ${DEV_PROJECT}"
                // create build. override the exit code since it complains about exising imagestream
-               sh "oc new-build --name=tasks --image-stream=jboss-eap70-openshift --binary=true --labels=app=tasks -n ${DEV_PROJECT} || true"
+               //sh "oc new-build --name=tasks --image-stream=jboss-eap70-openshift --binary=true --labels=app=tasks -n ${DEV_PROJECT} || true"
+               sh "oc new-build --name=kitchensink --image-stream=jboss-eap70-openshift --binary=true --labels=app=kitchensink -n ${DEV_PROJECT} || true"
                // build image
-               sh "oc start-build tasks --from-dir=oc-build --wait=true -n ${DEV_PROJECT}"
+               sh "oc start-build kitchensink --from-dir=oc-build --wait=true -n ${DEV_PROJECT}"
                // deploy image
-               sh "oc new-app tasks:latest -n ${DEV_PROJECT}"
-               sh "oc expose svc/tasks -n ${DEV_PROJECT}"
+               //sh "oc new-app tasks:latest -n ${DEV_PROJECT}"
+               sh "oc process -f template.yaml -p APPLICATION_NAME=kitchensink APPLICATION_ENV=latest | oc create -f -  -n ${DEV_PROJECT}" 
+               //sh "oc expose svc/kitchensink -n ${DEV_PROJECT}"
              }
 
              stage ('Deploy STAGE') {
@@ -140,10 +143,12 @@ objects:
                sh "oc tag ${DEV_PROJECT}/tasks:latest ${STAGE_PROJECT}/tasks:${v}"
                sh "oc project ${STAGE_PROJECT}"
                // clean up. keep the imagestream
-               sh "oc delete bc,dc,svc,route -l app=tasks -n ${STAGE_PROJECT}"
+               //sh "oc delete bc,dc,svc,route -l app=tasks -n ${STAGE_PROJECT}"
+               sh "oc delete bc,dc,svc,route -l application=kitchensink -n ${STAGE_PROJECT}"
                // deploy stage image
-               sh "oc new-app tasks:${v} -n ${STAGE_PROJECT}"
-               sh "oc expose svc/tasks -n ${STAGE_PROJECT}"
+               //sh "oc new-app tasks:${v} -n ${STAGE_PROJECT}"
+               sh "oc process -f template.yaml -p APPLICATION_NAME=kitchensink APPLICATION_ENV=${v} | oc create -f -  -n ${DEV_PROJECT}" 
+               //sh "oc expose svc/kitchensink -n ${STAGE_PROJECT}"
              }
           }
 
@@ -651,9 +656,9 @@ objects:
       # import github repository
       cat <<EOF > /tmp/data.json
       {
-        "clone_addr": "https://github.com/OpenShiftDemos/openshift-tasks.git",
+        "clone_addr": "https://github.com/jbrannst/appdev-foundations-kitchensink.git",
         "uid": 1,
-        "repo_name": "openshift-tasks"
+        "repo_name": "kitchensink"
       }
       EOF
 
@@ -662,7 +667,7 @@ objects:
 
       if [ $RETURN != "201" ]
       then
-        echo "ERROR: Failed to imported openshift-tasks GitHub repo"
+        echo "ERROR: Failed to imported kitchensink GitHub repo"
         exit 255
       fi
 
@@ -673,7 +678,7 @@ objects:
       {
         "type": "gogs",
         "config": {
-          "url": "https://openshift.default.svc.cluster.local/oapi/v1/namespaces/$CICD_PROJECT/buildconfigs/tasks-pipeline/webhooks/${WEBHOOK_SECRET}/generic",
+          "url": "https://openshift.default.svc.cluster.local/oapi/v1/namespaces/$CICD_PROJECT/buildconfigs/cicd-pipeline/webhooks/${WEBHOOK_SECRET}/generic",
           "content_type": "json"
         },
         "events": [
@@ -684,7 +689,7 @@ objects:
       EOF
 
       RETURN=$(curl -o /dev/null -sL -w "%{http_code}" -H "Content-Type: application/json" \
-      -u gogs:${GOGS_PASSWORD} -X POST http://$GOGSSVC:3000/api/v1/repos/gogs/openshift-tasks/hooks -d @/tmp/data.json)
+      -u gogs:${GOGS_PASSWORD} -X POST http://$GOGSSVC:3000/api/v1/repos/gogs/kitchensink/hooks -d @/tmp/data.json)
 
       if [ $RETURN != "201" ]
       then
