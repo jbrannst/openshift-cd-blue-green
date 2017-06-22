@@ -107,7 +107,7 @@ objects:
                        step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/TEST-*.xml'])
                    },
                    'Static Analysis': {
-                       sh "${mvnCmd} jacoco:report sonar:sonar -Dsonar.host.url=http://sonarqube:9000 -DskipTests=true"
+                       sh "${mvnCmd} sonar:sonar -Dsonar.host.url=http://sonarqube:9000 -DskipTests=true"
                    }
                )
              }
@@ -141,7 +141,8 @@ objects:
 
                def v = version()
                // tag for stage
-               sh "oc tag ${DEV_PROJECT}/tasks:latest ${STAGE_PROJECT}/tasks:${v}"
+               //sh "oc tag ${DEV_PROJECT}/tasks:latest ${STAGE_PROJECT}/tasks:${v}"
+               sh "oc tag jb-dev/kitchensink:latest jb-stage/kitchensink:${v}"
                sh "oc project ${STAGE_PROJECT}"
                // clean up. keep the imagestream
                //sh "oc delete bc,dc,svc,route -l app=tasks -n ${STAGE_PROJECT}"
