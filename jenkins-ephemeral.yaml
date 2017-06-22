@@ -23,7 +23,6 @@ metadata:
     template.openshift.io/support-url: https://access.redhat.com
   creationTimestamp: 2017-06-18T15:44:17Z
   name: jenkins-ephemeral
-  namespace: openshift
   resourceVersion: "468"
   selfLink: /oapi/v1/namespaces/openshift/templates/jenkins-ephemeral
   uid: fcd6fbe1-543c-11e7-aaf0-021cf59df92d
