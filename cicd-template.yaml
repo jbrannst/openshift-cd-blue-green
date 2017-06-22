@@ -92,7 +92,7 @@ objects:
         jenkinsfile: |-
           node('maven') {
              // define commands
-             def mvnCmd = "mvn -s configuration/cicd-settings.xml"
+             def mvnCmd = "mvn -s maven-settings.xml"
 
              stage ('Build') {
                git branch: 'master', url: 'http://gogs:3000/gogs/kitchensink.git'
