@@ -126,8 +126,10 @@ objects:
                sh "oc new-build --name=kitchensink --image-stream=jboss-eap70-openshift --binary=true --labels=application=kitchensink -n ${DEV_PROJECT} || true"
                // build image
                sh "oc start-build kitchensink --from-dir=oc-build --wait=true -n ${DEV_PROJECT}"
+               // deploy database
+               sh "oc new-app postgresql-ephemeral -p DATABASE_SERVICE_NAME=${APPLICATION_NAME}-latest-postgresql -p POSTGRESQL_USER=user -p POSTGRESQL_DATABASE=db -p POSTGRESQL_PASSWORD=password -l application=kitchensink -n ${DEV_PROJECT}"
                // deploy image
-               sh "oc process -f template.yaml -p APPLICATION_NAME=kitchensink APPLICATION_ENV=latest | oc create -f -  -n ${DEV_PROJECT}" 
+               sh "oc process -f app-template.yaml -p APPLICATION_NAME=kitchensink APPLICATION_ENV=latest | oc create -f -  -n ${DEV_PROJECT}" 
              }
              
              stage ('Smoke tests') {
@@ -146,8 +148,10 @@ objects:
                sh "oc project ${PROD_PROJECT}"
                // clean up. keep the imagestream
                sh "oc delete bc,dc,svc,route -l application=kitchensink -n ${PROD_PROJECT}"
+               // deploy database
+               sh "oc new-app postgresql-ephemeral -p DATABASE_SERVICE_NAME=${APPLICATION_NAME}-${version}-postgresql -p POSTGRESQL_USER=user -p POSTGRESQL_DATABASE=db -p POSTGRESQL_PASSWORD=password -l application=kitchensink -n ${PROD_PROJECT}"
                // deploy PROD image
-               sh "oc process -f template.yaml -p APPLICATION_NAME=kitchensink APPLICATION_ENV=${version} | oc create -f -  -n ${PROD_PROJECT}" 
+               sh "oc process -f app-template.yaml -p APPLICATION_NAME=kitchensink APPLICATION_ENV=${version} | oc create -f -  -n ${PROD_PROJECT}" 
              }
           }
 
