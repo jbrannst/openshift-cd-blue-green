@@ -121,17 +121,13 @@ objects:
                sh "cp target/jboss-kitchensink-angularjs.war oc-build/deployments/ROOT.war"
                sh "oc project ${DEV_PROJECT}"
                // clean up. keep the image stream
-               //sh "oc delete bc,dc,svc,route -l app=tasks -n ${DEV_PROJECT}"
                sh "oc delete bc,dc,svc,route -l application=kitchensink -n ${DEV_PROJECT}"
                // create build. override the exit code since it complains about exising imagestream
-               //sh "oc new-build --name=tasks --image-stream=jboss-eap70-openshift --binary=true --labels=app=tasks -n ${DEV_PROJECT} || true"
-               sh "oc new-build --name=kitchensink --image-stream=jboss-eap70-openshift --binary=true --labels=app=kitchensink -n ${DEV_PROJECT} || true"
+               sh "oc new-build --name=kitchensink --image-stream=jboss-eap70-openshift --binary=true --labels=application=kitchensink -n ${DEV_PROJECT} || true"
                // build image
                sh "oc start-build kitchensink --from-dir=oc-build --wait=true -n ${DEV_PROJECT}"
                // deploy image
-               //sh "oc new-app tasks:latest -n ${DEV_PROJECT}"
                sh "oc process -f template.yaml -p APPLICATION_NAME=kitchensink APPLICATION_ENV=latest | oc create -f -  -n ${DEV_PROJECT}" 
-               //sh "oc expose svc/kitchensink -n ${DEV_PROJECT}"
              }
 
              stage ('Deploy STAGE') {
@@ -139,18 +135,14 @@ objects:
                   input message: "Promote to STAGE?", ok: "Promote"
                }
 
-               def v = version()
+               def version =  sh ( script: 'date +%s', returnStdout: true ).trim()
                // tag for stage
-               //sh "oc tag ${DEV_PROJECT}/tasks:latest ${STAGE_PROJECT}/tasks:${v}"
-               sh "oc tag jb-dev/kitchensink:latest jb-stage/kitchensink:${v}"
+               sh "oc tag ${DEV_PROJECT}/kitchensink:latest ${STAGE_PROJECT}/kitchensink:${version}"
                sh "oc project ${STAGE_PROJECT}"
                // clean up. keep the imagestream
-               //sh "oc delete bc,dc,svc,route -l app=tasks -n ${STAGE_PROJECT}"
                sh "oc delete bc,dc,svc,route -l application=kitchensink -n ${STAGE_PROJECT}"
                // deploy stage image
-               //sh "oc new-app tasks:${v} -n ${STAGE_PROJECT}"
-               sh "oc process -f template.yaml -p APPLICATION_NAME=kitchensink APPLICATION_ENV=${v} | oc create -f -  -n ${DEV_PROJECT}" 
-               //sh "oc expose svc/kitchensink -n ${STAGE_PROJECT}"
+               sh "oc process -f template.yaml -p APPLICATION_NAME=kitchensink APPLICATION_ENV=${version} | oc create -f -  -n ${STAGE_PROJECT}" 
              }
           }
 
