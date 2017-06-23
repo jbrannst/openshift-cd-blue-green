@@ -40,9 +40,9 @@ parameters:
   value: dev
   name: DEV_PROJECT
   required: true
-- displayName: STAGE project name
-  value: stage
-  name: STAGE_PROJECT
+- displayName: PROD project name
+  value: prod
+  name: PROD_PROJECT
   required: true
 - displayName: Gogs version
   value: 0.9.113
@@ -135,19 +135,19 @@ objects:
                sh 'curl http://kitchensink.${DEV_PROJECT}.svc.cluster.local:8080/rest/members | grep -q \"John Smith\"'
              }
 
-             stage ('Deploy STAGE') {
+             stage ('Deploy PROD') {
                timeout(time:5, unit:'MINUTES') {
-                  input message: "Promote to STAGE?", ok: "Promote"
+                  input message: "Promote to PROD?", ok: "Promote"
                }
 
                def version =  sh ( script: 'date +%s', returnStdout: true ).trim()
-               // tag for stage
-               sh "oc tag ${DEV_PROJECT}/kitchensink:latest ${STAGE_PROJECT}/kitchensink:${version}"
-               sh "oc project ${STAGE_PROJECT}"
+               // tag for PROD
+               sh "oc tag ${DEV_PROJECT}/kitchensink:latest ${PROD_PROJECT}/kitchensink:${version}"
+               sh "oc project ${PROD_PROJECT}"
                // clean up. keep the imagestream
-               sh "oc delete bc,dc,svc,route -l application=kitchensink -n ${STAGE_PROJECT}"
-               // deploy stage image
-               sh "oc process -f template.yaml -p APPLICATION_NAME=kitchensink APPLICATION_ENV=${version} | oc create -f -  -n ${STAGE_PROJECT}" 
+               sh "oc delete bc,dc,svc,route -l application=kitchensink -n ${PROD_PROJECT}"
+               // deploy PROD image
+               sh "oc process -f template.yaml -p APPLICATION_NAME=kitchensink APPLICATION_ENV=${version} | oc create -f -  -n ${PROD_PROJECT}" 
              }
           }
 
