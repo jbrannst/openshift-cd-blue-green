@@ -133,7 +133,7 @@ objects:
              }
              
              stage ('Smoke tests') {
-               openshiftVerifyService("kitchensink")
+               openshiftVerifyService(deploymentConfig: "kitchensink", namespace: "jb-dev")
                sh 'curl -H "Content-Type: application/json" -X POST -d \'{\"name\":\"John Smith\",\"email\":\"john.smith@xyz.com\",\"phoneNumber\":\"1234567890\"}\' http://kitchensink.${DEV_PROJECT}.svc.cluster.local:8080/rest/members'
                sh 'curl http://kitchensink.${DEV_PROJECT}.svc.cluster.local:8080/rest/members | grep -q \"John Smith\"'
              }
