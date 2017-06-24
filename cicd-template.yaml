@@ -36,11 +36,11 @@ parameters:
   generate: expression
   name: SONAR_POSTGRESQL_PASSWORD
   required: true
-- displayName: DEV project name
-  value: dev
-  name: DEV_PROJECT
+- displayName: Test project name
+  value: test
+  name: TEST_PROJECT
   required: true
-- displayName: PROD project name
+- displayName: Production project name
   value: prod
   name: PROD_PROJECT
   required: true
@@ -116,26 +116,26 @@ objects:
               sh "${mvnCmd} deploy -DskipTests=true"
              }
 
-             stage ('Deploy DEV') {
+             stage ('Deploy TEST') {
                sh "rm -rf oc-build && mkdir -p oc-build/deployments"
                sh "cp target/jboss-kitchensink-angularjs.war oc-build/deployments/ROOT.war"
-               sh "oc project ${DEV_PROJECT}"
+               sh "oc project ${TEST_PROJECT}"
                // clean up. keep the image stream
-               sh "oc delete bc,dc,svc,route -l application=kitchensink -n ${DEV_PROJECT}"
+               sh "oc delete bc,dc,svc,route -l application=kitchensink -n ${TEST_PROJECT}"
                // create build. override the exit code since it complains about exising imagestream
-               sh "oc new-build --name=kitchensink --image-stream=jboss-eap70-openshift --binary=true --labels=application=kitchensink -n ${DEV_PROJECT} || true"
+               sh "oc new-build --name=kitchensink --image-stream=jboss-eap70-openshift --binary=true --labels=application=kitchensink -n ${TEST_PROJECT} || true"
                // build image
-               sh "oc start-build kitchensink --from-dir=oc-build --wait=true -n ${DEV_PROJECT}"
+               sh "oc start-build kitchensink --from-dir=oc-build --wait=true -n ${TEST_PROJECT}"
                // deploy database
-               sh "oc new-app postgresql-ephemeral -p DATABASE_SERVICE_NAME=kitchensink-postgresql -p POSTGRESQL_USER=user -p POSTGRESQL_DATABASE=db -p POSTGRESQL_PASSWORD=password -l application=kitchensink -n ${DEV_PROJECT}"
+               sh "oc new-app postgresql-ephemeral -p DATABASE_SERVICE_NAME=kitchensink-test-postgresql -p POSTGRESQL_USER=user -p POSTGRESQL_DATABASE=db -p POSTGRESQL_PASSWORD=password -l application=kitchensink-test -n ${TEST_PROJECT}"
                // deploy image
-               sh "oc process -f kitchensink-template.yaml -p | oc create -f -  -n ${DEV_PROJECT}" 
+               sh "oc process -f kitchensink-template.yaml -p APPLICATION_ENV=test | oc create -f -  -n ${TEST_PROJECT}" 
              }
              
              stage ('Smoke tests') {
-               openshiftVerifyService(deploymentConfig: "kitchensink", namespace: "jb-dev")
-               sh 'curl -H "Content-Type: application/json" -X POST -d \'{\"name\":\"John Smith\",\"email\":\"john.smith@xyz.com\",\"phoneNumber\":\"1234567890\"}\' http://kitchensink.${DEV_PROJECT}.svc.cluster.local:8080/rest/members'
-               sh 'curl http://kitchensink.${DEV_PROJECT}.svc.cluster.local:8080/rest/members | grep -q \"John Smith\"'
+               openshiftVerifyService(deploymentConfig: "kitchensink-test", namespace: ${TEST_PROJECT})
+               sh 'curl -H "Content-Type: application/json" -X POST -d \'{\"name\":\"John Smith\",\"email\":\"john.smith@xyz.com\",\"phoneNumber\":\"1234567890\"}\' http://kitchensink-test.${TEST_PROJECT}.svc.cluster.local:8080/rest/members'
+               sh 'curl http://kitchensink-test.${TEST_PROJECT}.svc.cluster.local:8080/rest/members | grep -q \"John Smith\"'
              }
 
              stage ('Deploy PROD') {
@@ -147,12 +147,35 @@ objects:
                // tag for PROD
                sh "oc tag ${DEV_PROJECT}/kitchensink:latest ${PROD_PROJECT}/kitchensink:${version}"
                sh "oc project ${PROD_PROJECT}"
-               // clean up. keep the imagestream
-               sh "oc delete bc,dc,svc,route -l application=kitchensink -n ${PROD_PROJECT}"
-               // deploy database
-               sh "oc new-app postgresql-ephemeral -p DATABASE_SERVICE_NAME=kitchensink-postgresql -p POSTGRESQL_USER=user -p POSTGRESQL_DATABASE=db -p POSTGRESQL_PASSWORD=password -l application=kitchensink -n ${PROD_PROJECT}"
-               // deploy PROD image
-               sh "oc process -f app-template.yaml -p IMAGE_VERSION=${version} | oc create -f -  -n ${PROD_PROJECT}" 
+               
+               // check if blue is active
+               def BLUE_ACTIVE =  sh ( script: 'oc get route kitchensink | grep kitchensink-blue', returnStatus: true ) == 0
+               if (BLUE_ACTIVE) {  
+               
+               // lets deploy and switch to green
+                 // clean up green. keep the imagestream
+                 sh "oc delete bc,dc,svc,route -l application=kitchensink-green -n ${PROD_PROJECT}" || true
+                 // deploy db
+                 sh "oc new-app postgresql-ephemeral -p DATABASE_SERVICE_NAME=kitchensink-green-postgresql -p POSTGRESQL_USER=user -p POSTGRESQL_DATABASE=db -p POSTGRESQL_PASSWORD=password -l application=kitchensink-green -n ${PROD_PROJECT}"
+                 // deploy PROD image
+                 sh "oc process -f kitchensink-template.yaml -p APPLICATION_ENV=green IMAGE_VERSION=${version} | oc create -f -  -n ${PROD_PROJECT}" 
+                 // expose the main route
+                 sh "oc expose service kitchensink-green -l application=kitchensink --name=kitchensink --selector=application=kitchensink-green"
+               
+               } else { // blue is not active
+               
+                 // lets deploy to blue
+                 // clean up blue. keep the imagestream
+                 sh "oc delete bc,dc,svc,route -l application=kitchensink-blue -n ${PROD_PROJECT}" || true
+                 // deploy db
+                 sh "oc new-app postgresql-ephemeral -p DATABASE_SERVICE_NAME=kitchensink-blue-postgresql -p POSTGRESQL_USER=user -p POSTGRESQL_DATABASE=db -p POSTGRESQL_PASSWORD=password -l application=kitchensink-blue -n ${PROD_PROJECT}"
+                 // deploy PROD image
+                 sh "oc process -f kitchensink-template.yaml -p APPLICATION_ENV=blue IMAGE_VERSION=${version} | oc create -f -  -n ${PROD_PROJECT}" 
+                 // expose the main route
+                 sh "oc expose service kitchensink-blue -l application=kitchensink --name=kitchensink --selector=application=kitchensink-blue"
+
+               }
+               
              }
           }
 
