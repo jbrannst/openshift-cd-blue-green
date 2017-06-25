@@ -139,9 +139,9 @@ objects:
                   input message: "Promote to PROD?", ok: "Promote"
                }
                
-               // generate tag for production
+               // generate tag for production using the unique commit hash
                VERSION =  sh ( 
-                  script: "date +%s", 
+                  script: "git rev-parse --short=12 HEAD", 
                   returnStdout: true 
                ).trim()
                sh "oc tag ${TEST_PROJECT}/kitchensink:latest ${PROD_PROJECT}/kitchensink:${VERSION}"
