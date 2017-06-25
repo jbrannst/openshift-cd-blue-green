@@ -394,7 +394,7 @@ objects:
             httpGet:
               port: 3000
               path: /
-            timeoutSeconds: 1
+            timeoutSeconds: 2
           name: gogs
           ports:
           - containerPort: 3000
