@@ -6,24 +6,31 @@ This repository includes the infrastructure and pipeline definition for continuo
 
 1. Code is cloned from Gogs, built, tested and analyzed for bugs and bad patterns
 2. The WAR artifact is pushed to Nexus Repository manager
-3. A Docker image (_tasks:latest_) is built based on the _Tasks_ application WAR artifact deployed on JBoss EAP 6
-4. The _Tasks_ Docker image is deployed in a fresh new container in DEV project
-5. If tests successful, the DEV image is tagged with the application version (_tasks:7.x_) in the STAGE project
-6. The staged image is deployed in a fresh new container in the STAGE project
+3. A Docker image (_kitchensink:latest_) is built based on the _Kitchensink_ application WAR artifact deployed on JBoss EAP 7
+4. The _Kitchensink_ Docker image is deployed in a fresh new container in TEST project
+5. If tests successful, the TEST image is awaiting approval for production deployment
+6. When approved the TEST image is tagged with the commit hash and deployed into the PROD project passive deployment
+6. If tests succeed, the passive deployment is switched to active
 
 The following diagram shows the steps included in the deployment pipeline:
 
 ![](images/pipeline.png?raw=true)
 
-The application used in this pipeline is a JAX-RS application which is available on GitHub and is imported into Gogs during the setup process:
-[https://github.com/OpenShiftDemos/openshift-tasks](https://github.com/OpenShiftDemos/openshift-tasks/tree/eap-7)
+The application used in this pipeline is a JAX-RS application with a database which is available on GitHub and is imported into Gogs during the setup process:
+[https://github.com/jbrannst/appdev-foundations-kitchensink](https://github.com/jbrannst/appdev-foundations-kitchensink)
 
 # Prerequisites
-* 8+ GB memory available on OpenShift nodes
+* 12+ GB memory available on OpenShift nodes
 * JBoss EAP 7 imagestreams imported to OpenShift (see Troubleshooting section for details)
 
 # Setup
-Follow these [instructions](docs/oc-cluster.md) in order to create a local OpenShift cluster. Otherwise using your current OpenShift cluster, create the following projects for CI/CD components, Dev and Stage environments:
+Follow these [instructions](docs/oc-cluster.md) in order to create a local OpenShift cluster. Otherwise using your current OpenShift cluster, run the installation script to setup the components:
+
+  ```
+  ./setup.sh
+  ```
+
+It will create the following projects for CI/CD components, Dev and Stage environments:
 
   ```
   oc new-project dev --display-name="Tasks - Dev"
