@@ -76,6 +76,8 @@ objects:
       app: cicd-pipeline
       name: cicd-pipeline
     name: cicd-pipeline
+    annotations:
+      pipeline.alpha.openshift.io/uses: '[{"name": "jenkins", "namespace": "", "kind": "DeploymentConfig"}]'
   spec:
     triggers:
       - type: GitHub
@@ -86,96 +88,20 @@ objects:
           secret: ${WEBHOOK_SECRET}
     runPolicy: Serial
     source:
-      type: None
+      type: Git
+      git:
+        uri: 'http://gogs:3000/gogs/application.git'
+        ref: master
     strategy:
-      jenkinsPipelineStrategy:
-        jenkinsfile: |-
-          node('maven') {
-             // define commands
-             def mvnCmd = "mvn -s maven-settings.xml"
-
-
-             stage ('Build') {
-               git branch: 'master', url: 'http://gogs:3000/gogs/kitchensink.git'
-               sh "curl -O https://raw.githubusercontent.com/jbrannst/openshift-cd-demo/ocp-3.5/configuration/maven-settings.xml"
-               sh "${mvnCmd} clean install -DskipTests=true"
-             }
-
-             stage ('Test and Analysis') {
-               parallel (
-                   'Test': {
-                       sh "${mvnCmd} test"
-                       step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/TEST-*.xml'])
-                   },
-                   'Static Analysis': {
-                       sh "${mvnCmd} sonar:sonar -Dsonar.host.url=http://sonarqube:9000 -DskipTests=true"
-                   }
-               )
-             }
-
-             stage ('Push to Nexus') {
-              sh "${mvnCmd} deploy -DskipTests=true"
-             }
-
-             stage ('Deploy TEST') {
-               sh "rm -rf oc-build && mkdir -p oc-build/deployments"
-               sh "cp target/jboss-kitchensink-angularjs.war oc-build/deployments/ROOT.war"
-               sh "oc project ${TEST_PROJECT}"
-               // create build. override the exit code since it complains about exising imagestream and buildconfig
-               sh "oc new-build --name=kitchensink --image-stream=jboss-eap70-openshift --binary=true --labels=application=kitchensink -n ${TEST_PROJECT} || true"
-               // build image
-               sh "oc start-build kitchensink --from-dir=oc-build --wait=true -n ${TEST_PROJECT}"
-               // deploy
-               deploy_kitchensink("test", "${TEST_PROJECT}", "latest")
-             }
-             
-             stage ('Smoke tests') {
-               verify_kitchensink("test", "${TEST_PROJECT}")
-               // further tests..
-             }
-
-             stage ('Deploy PROD') {
-               timeout(time:5, unit:'MINUTES') {
-                  input message: "Promote to PROD?", ok: "Promote"
-               }
-               
-               // generate tag for production using the unique commit hash
-               VERSION =  sh ( 
-                  script: "git rev-parse --short=12 HEAD", 
-                  returnStdout: true 
-               ).trim()
-               sh "oc tag ${TEST_PROJECT}/kitchensink:latest ${PROD_PROJECT}/kitchensink:${VERSION}"
-               sh "oc project ${PROD_PROJECT}"
-               
-               // check if blue deployment is active
-               BLUE_ACTIVE =  sh ( 
-                  script: "oc get route kitchensink -n ${PROD_PROJECT} | grep kitchensink-blue", 
-                  returnStatus: true 
-               ) == 0
-               
-               // deploy to passive
-               TARGET = BLUE_ACTIVE ? "green" : "blue"
-               echo "Deploying to ${TARGET}"
-               
-               deploy_kitchensink("${TARGET}", "${PROD_PROJECT}", "${VERSION}")
-               verify_kitchensink("${TARGET}", "${PROD_PROJECT}")
-               sh "oc process -f bluegreen-route-template.yaml -p APPLICATION_ENV=${TARGET} | oc apply -f -  -n ${PROD_PROJECT}"
-             }
-          }
-          def deploy_kitchensink(flavor, namespace, version = "latest") {
-            sh "oc process -f template.yaml -p APPLICATION_ENV=${flavor} IMAGE_VERSION=${version} | oc apply -f -  -n ${namespace}"
-          }
-          def verify_kitchensink(flavor, namespace) {
-            openshiftVerifyDeployment(deploymentConfig: "kitchensink-${flavor}", namespace: "${namespace}")
-            sh "curl -H \"Content-Type: application/json\" -X POST -d \'{\"name\":\"John Smith\",\"email\":\"john.smith@xyz.com\",\"phoneNumber\":\"1234567890\"}\' http://kitchensink-${flavor}.${namespace}.svc.cluster.local:8080/rest/members"
-            sh "curl http://kitchensink-${flavor}.${namespace}.svc.cluster.local:8080/rest/members | grep -q \"John Smith\""
-          }
-
-          
       type: JenkinsPipeline
-      type: Generic
+      jenkinsPipelineStrategy:
+        jenkinsfilePath: Jenkinsfile
+    output: {}
+    resources: {}
+    postCommit: {}
+    nodeSelector: {}
   status:
-    lastVersion: 0
+    lastVersion: 1
 # Sonatype Nexus
 - apiVersion: v1
   kind: Service
@@ -674,7 +600,7 @@ objects:
       {
         "clone_addr": "https://github.com/jbrannst/appdev-foundations-kitchensink.git",
         "uid": 1,
-        "repo_name": "kitchensink"
+        "repo_name": "application"
       }
       EOF
 
@@ -683,7 +609,7 @@ objects:
 
       if [ $RETURN != "201" ]
       then
-        echo "ERROR: Failed to imported kitchensink GitHub repo"
+        echo "ERROR: Failed to imported application GitHub repo"
         exit 255
       fi
 
@@ -705,7 +631,7 @@ objects:
       EOF
 
       RETURN=$(curl -o /dev/null -sL -w "%{http_code}" -H "Content-Type: application/json" \
-      -u gogs:${GOGS_PASSWORD} -X POST http://$GOGSSVC:3000/api/v1/repos/gogs/kitchensink/hooks -d @/tmp/data.json)
+      -u gogs:${GOGS_PASSWORD} -X POST http://$GOGSSVC:3000/api/v1/repos/gogs/application/hooks -d @/tmp/data.json)
 
       if [ $RETURN != "201" ]
       then

@@ -1,12 +1,26 @@
-cicd=jb-cicd
-test=jb-test
-prod=jb-prod
-oc new-project ${test} --display-name="Kitchensink - Test"
-oc new-project ${prod} --display-name="Kitchensink - Prod"
-oc new-project ${cicd} --display-name="CI/CD"
+cicd=cicd
+test=ks-test
+prod=ks-prod
+date
+echo "Creating namespaces."
+oc new-project ${test} --display-name="Kitchensink - Test" > /dev/null
+oc new-project ${prod} --display-name="Kitchensink - Prod" > /dev/null
+oc new-project ${cicd} --display-name="CI/CD" > /dev/null
+echo "Creating components."
 oc process -f cicd-template.yaml -p TEST_PROJECT=${test} -p PROD_PROJECT=${prod} | oc create -f - -n ${cicd}
 oc set resources dc/jenkins --limits=memory=1Gi
 oc policy add-role-to-user edit system:serviceaccount:${cicd}:jenkins -n ${test}
 oc policy add-role-to-user edit system:serviceaccount:${cicd}:jenkins -n ${prod}
 oc policy add-role-to-user view system:serviceaccount:${test}:default -n ${test}
 oc policy add-role-to-user view system:serviceaccount:${prod}:default -n ${prod}
+echo "Waiting for Jenkins to start."
+oc logs -f dc/jenkins > /dev/null
+echo "Waiting for Gogs installation."
+oc logs -f install-gogs > /dev/null
+echo "Allow ${cicd} project access to test the others. Only needed if multitenant cluster, requires admin rights to execute."
+oadm pod-network make-projects-global cicd
+date
+echo "Running cicd pipeline"
+oc start-build -F cicd-pipeline > /dev/null
+date
+echo "Now go to ${cicd} project and update the app in gogs. Username=gogs & Password=password"
