@@ -96,6 +96,11 @@ objects:
       type: JenkinsPipeline
       jenkinsPipelineStrategy:
         jenkinsfilePath: Jenkinsfile
+        env:
+        - name: "TEST_PROJECT_PARAM"
+          value: "${TEST_PROJECT}"
+        - name: "PROD_PROJECT_PARAM"
+          value: "${PROD_PROJECT}"
     output: {}
     resources: {}
     postCommit: {}
