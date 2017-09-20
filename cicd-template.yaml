@@ -18,6 +18,11 @@ parameters:
   value: password
   name: GOGS_PASSWORD
   required: true
+- description: Git repository to install into Gogs. It should contain a Jenkinsfile at the root.
+  displayName: Git source repository
+  value: https://github.com/jbrannst/appdev-foundations-kitchensink.git
+  name: GIT_REPO
+  required: true
 - description: Username for PostgreSQL backend (Gogs Git server and SonarQube)
   displayName: PostgreSQL User
   from: user[A-Z0-9]{3}
@@ -603,7 +608,7 @@ objects:
       # import github repository
       cat <<EOF > /tmp/data.json
       {
-        "clone_addr": "https://github.com/jbrannst/appdev-foundations-kitchensink.git",
+        "clone_addr": "$GIT_REPO",
         "uid": 1,
         "repo_name": "application"
       }
