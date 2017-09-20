@@ -494,6 +494,8 @@ objects:
         valueFrom:
           fieldRef:
             fieldPath: metadata.namespace
+      - name: GIT_REPO
+        value: $GIT_REPO
     volumes:
       - name: gogs-install
         configMap:
