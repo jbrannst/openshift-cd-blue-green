@@ -18,8 +18,6 @@ echo "Waiting for Jenkins to start."
 oc logs -f dc/jenkins > /dev/null
 echo "Waiting for Gogs installation."
 oc logs -f install-gogs > /dev/null
-echo "Allow ${cicd} project access to test the others. Only needed if multitenant cluster, requires admin rights to execute."
-oadm pod-network make-projects-global cicd
 date
 echo "Running cicd pipeline"
 oc start-build -F cicd-pipeline > /dev/null
